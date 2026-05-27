@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Layer Routine Tracker</title>
+    <style>
+        /* --- CONFIGURABLE THEME STYLES --- */
+        :root {
+            --bg-blur-opacity: rgba(0, 0, 0, 0.7);
+            --font-color: #ffffff;
+            --button-text-color: #111111;
+            --button-bg-color: #ffffff;
+            --button-hover-bg: #e0e0e0;
+            --danger-color: #e74c3c;
+            --danger-hover: #c0392b;
+            --success-color: #2ecc71;
+            --success-hover: #27ae60;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: flex-end; /* Shifts everything to the right side of the screen */
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            color: var(--font-color);
+            transition: background 0.5s ease;
+            background-color: #111;
+        }
+
+        /* THE PACKING LAYOUT */
+        .app-layout {
+            z-index: 10;
+            margin-right: 8%; /* Creates a clean gap from the right edge of the screen */
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* MAIN CONTAINER FOR THE INTERACTION LAYERS */
+        .content-container {
+            text-align: center;
+            background: var(--bg-blur-opacity);
+            padding: 45px;
+            border-radius: 24px;
+            width: 100%;
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 2.3rem;
+            margin-bottom: 25px;
+            letter-spacing: 1px;
+            line-height: 1.3;
+        }
+
+        /* BUTTON LAYOUT & STYLES */
+        .btn-container {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .choice-btn {
+            background-color: var(--button-bg-color);
+            color: var(--button-text-color);
+            border: none;
+            padding: 14px 35px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 30px;
+            transition: transform 0.2s, background-color 0.2s;
+            min-width: 120px;
+        }
+
+        .choice-btn:hover {
+            transform: scale(1.05);
+            background-color: var(--button-hover-bg);
+        }
+
+        .menu-btn {
+            width: 100%;
+            text-align: left;
+            padding: 14px 25px;
+            font-size: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .final-proceed-btn {
+            background-color: var(--success-color);
+            color: #ffffff;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .final-proceed-btn:hover {
+            background-color: var(--success-hover);
+        }
+
+        .return-btn {
+            background-color: var(--danger-color);
+            color: white;
+            margin-top: 25px;
+        }
+        
+        .return-btn:hover {
+            background-color: var(--danger-hover);
+        }
+
+        /* INPUT FIELD STYLES */
+        input[type="time"], textarea {
+            width: 100%;
+            padding: 12px;
+            margin-top: 15px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        textarea {
+            height: 100px;
+            resize: none;
+        }
+
+        .checkbox-grid {
+            text-align: left;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 20px 0;
+        }
+        
+        .checkbox-grid label {
+            font-size: 1.05rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* BACKGROUND GIF FILL SETUP */
+        .bg-gif {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            opacity: 0.5;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .check-mark {
+            color: var(--success-color);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <img id="background-gif" class="bg-gif" src="https://media.giphy.com/media/3og0IPxMM0xq_R6fKg/giphy.gif" alt="Background GIF">
+
+    <div class="app-layout">
+        <div class="content-container">
+            <h1 id="main-text">GOOD MORNING</h1>
+
+            <div id="interaction-zone">
+                </div>
+
+            <button id="global-return-btn" class="choice-btn return-btn hidden" onclick="goToLayer2Menu()">← Back to Questions</button>
+        </div>
+    </div>
+
+    <script>
+        // --- SECURE STORAGE ENDPOINT ---
+        const SECURE_FORM_ENDPOINT = "https://formspree.io/f/YOUR_FORM_ID_HERE";
+
+        // State Tracking Objects
+        let userIsInOffice = true;
+        
+        let completionRegistry = {
+            q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false
+        };
+
+        const config = {
+            gifElement: document.getElementById('background-gif'),
+            textElement: document.getElementById('main-text'),
+            zoneElement: document.getElementById('interaction-zone'),
+            returnBtn: document.getElementById('global-return-btn')
+        };
+
+        // Initialize Layer One
+        function init() {
+            document.body.style.backgroundColor = "#111";
+            config.gifElement.src = "https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExcHo3Y2JucG84MnN3OXFyejh0aWJoYmxuZzhlcjk4NHB5NWsxbHYzaiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/d0THNFbZHEV4k/giphy.gif";
+            config.textElement.innerText = "GOOD MORNING";
+            config.zoneElement.innerHTML = `<button class="choice-btn" onclick="askOffice()">Good Morning</button>`;
+            config.returnBtn.classList.add('hidden');
+            
+            completionRegistry = { q1: false, q2: false, q3: false, q4: false, q5: false, q6: false, q7: false };
+        }
+
+        // --- LAYER 2: OFFICE ROUTE SELECTION ---
+        function askOffice() {
+            config.textElement.innerText = "Where are you ?";
+            config.gifElement.src = "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExa2Y5MHdydnBzbW96azBvbmhuaXl3eHVyN2w0dHZwcWQ1aHM2NjQ0dyZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/PibODdY9C5xiKzmRhW/giphy.gif";
+            
+            config.zoneElement.innerHTML = `
+                <div class="btn-container">
+                    <button class="choice-btn" onclick="setOfficeLocation(true)">Office</button>
+                    <button class="choice-btn" onclick="setOfficeLocation(false)">Home</button>
+                </div>
+            `;
+        }
+
+        function setOfficeLocation(status) {
+            userIsInOffice = status;
+            goToLayer2Menu();
+        }
+
+        // --- THE HUB: INTERACTIVE QUESTION DIRECTORY ---
+        function goToLayer2Menu() {
+            config.returnBtn.classList.add('hidden'); 
+            document.body.style.backgroundColor = "#111";
+            config.textElement.innerText = "Please update your status:";
+            config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNml4c2p2eGljYmZxbnB2bjJsZXFlbzlmdWRiNHoycjh1Y3Ixa294dCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/Sm9AfJRiZofjlrkAAl/giphy.gif";
+            
+            let htmlButtons = `<div class="btn-container" style="flex-direction: column; align-items: center;">`;
+            
+            htmlButtons += `<button class="choice-btn menu-btn" onclick="routeQ1()">1. Have you drunk water? ${completionRegistry.q1 ? '<span class="check-mark">✓</span>' : ''}</button>`;
+            htmlButtons += `<button class="choice-btn menu-btn" onclick="routeQ2()">2. Did you eat lunch? ${completionRegistry.q2 ? '<span class="check-mark">✓</span>' : ''}</button>`;
+            htmlButtons += `<button class="choice-btn menu-btn" onclick="routeQ3()">3. Are you eating snacks? ${completionRegistry.q3 ? '<span class="check-mark">✓</span>' : ''}</button>`;
+            htmlButtons += `<button class="choice-btn menu-btn" onclick="routeQ4()">4. Did you have any pain or something? ${completionRegistry.q4 ? '<span class="check-mark">✓</span>' : ''}</button>`;
+            htmlButtons += `<button class="choice-btn menu-btn" onclick="routeMeditation()">5. Did you do your meditation? ${completionRegistry.q5 ? '<span class="check-mark">✓</span>' : ''}</button>`;
+
+            if (!userIsInOffice) {
+                htmlButtons += `<button class="choice-btn menu-btn" onclick="routeRest()">6. Are you taking rest? ${completionRegistry.q6 ? '<span class="check-mark">✓</span>' : ''}</button>`;
+                htmlButtons += `<button class="choice-btn menu-btn" onclick="routeLectures()">7. Are you doing lectures? ${completionRegistry.q7 ? '<span class="check-mark">✓</span>' : ''}</button>`;
+            }
+
+            if (checkIfAllQuestionsAnswered()) {
+                htmlButtons += `<button class="choice-btn final-proceed-btn" onclick="goToFinalSummaryLayer()">Proceed to Final Summary Layer →</button>`;
+            }
+
+            htmlButtons += `</div>`;
+            config.zoneElement.innerHTML = htmlButtons;
+        }
+
+        function checkIfAllQuestionsAnswered() {
+            if (userIsInOffice) {
+                return completionRegistry.q1 && completionRegistry.q2 && completionRegistry.q3 && completionRegistry.q4 && completionRegistry.q5;
+            } else {
+                return completionRegistry.q1 && completionRegistry.q2 && completionRegistry.q3 && completionRegistry.q4 && completionRegistry.q5 && completionRegistry.q6 && completionRegistry.q7;
+            }
+        }
+
+        // ==========================================
+        // LAYER 3: QUESTION 1 BRANCH (WATER)
+        // ==========================================
+        function routeQ1() {
+            config.textElement.innerText = "Have you drunk water?";
+            config.zoneElement.innerHTML = `
+                <div class="btn-container">
+                    <button class="choice-btn" onclick="q1Result(true)">Yes</button>
+                    <button class="choice-btn" onclick="q1Result(false)">No</button>
+                </div>
+            `;
+        }
+        function q1Result(isYes) {
+            completionRegistry.q1 = true;
+            config.returnBtn.classList.remove('hidden');
+            if(isYes) {
+                config.textElement.innerText = "Great!";
+                document.body.style.backgroundColor = "#27ae60";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZWdkZ3RvZ2xiY3dydjJ2cTk3dHJsc253amszeGhodHZxdzZnYnYydSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/TdfyKrN7HGTIY/giphy.gif";
+            } else {
+                config.textElement.innerText = "Do it now!";
+                document.body.style.backgroundColor = "#c0392b";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMDM2NXA0ejcwcXg1YXNwMmh4ZXljaTM2amF2Njd0MG4wNmdqZWg2biZlcD12MV9naWZzX3NlYXJjaCZjdD1n/BjHIjM2YFC3rEUaMrw/giphy.gif";
+            }
+            config.zoneElement.innerHTML = "";
+        }
+
+        // ==========================================
+        // LAYER 4: QUESTION 2 BRANCH (LUNCH TIME)
+        // ==========================================
+        function routeQ2() {
+            config.textElement.innerText = "Did you eat lunch?";
+            config.zoneElement.innerHTML = `
+                <div class="btn-container">
+                    <button class="choice-btn" onclick="q2Result(true)">Yes</button>
+                    <button class="choice-btn" onclick="q2Result(false)">No</button>
+                </div>
+            `;
+        }
+        function q2Result(isYes) {
+            completionRegistry.q2 = true;
+            config.returnBtn.classList.remove('hidden');
+            if(isYes) {
+                config.textElement.innerText = "Log your Lunch Time";
+                document.body.style.backgroundColor = "#2980b9";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3cjllazM5OGl5eGRqa2ZhaGIxN2d3OXQ1Zm94aDdwejZ6cXg2ejJ0MCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/mB9gnpgb6q2TLAqOrW/giphy.gif";
+                config.zoneElement.innerHTML = `
+                    <input type="time" id="lunch-time" value="13:00">
+                    <div class="btn-container">
+                        <button class="choice-btn" onclick="submitLunchTime()">Submit Time</button>
+                    </div>
+                `;
+            } else {
+                config.textElement.innerText = "What ";
+                document.body.style.backgroundColor = "#7f8c8d";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3djVyb2dhZW5vMzI4cXNrc3Y4aHpjbWR4NzFxOHhrejZkOXF6NmkwbiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/cPKWZB2aaB3rO/giphy.gif";
+                config.zoneElement.innerHTML = "";
+            }
+        }
+        function submitLunchTime() {
+            const timeVal = document.getElementById('lunch-time').value;
+            alert(`Time recorded locally: ${timeVal}`);
+            goToLayer2Menu();
+        }
+
+        // ==========================================
+        // LAYER 5: QUESTION 3 BRANCH (SNACKS)
+        // ==========================================
+        function routeQ3() {
+            config.textElement.innerText = "Are you eating dates, almonds, and cashews?";
+            config.zoneElement.innerHTML = `
+                <div class="btn-container">
+                    <button class="choice-btn" onclick="q3Result(true)">Yes</button>
+                    <button class="choice-btn" onclick="q3Result(false)">No</button>
+                </div>
+            `;
+        }
+        function q3Result(isYes) {
+            completionRegistry.q3 = true;
+            config.returnBtn.classList.remove('hidden');
+            if(isYes) {
+                config.textElement.innerText = "Healthy Habits!";
+                document.body.style.backgroundColor = "#8e44ad";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNWhsMWd1NGMzZzljOXI3eWw2dm5yd2Z3emsybG42dmlqd3pibXQ3YSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/tIeCLkB8geYtW/giphy.gif";
+            } else {
+                config.textElement.innerText = "Okay";
+                document.body.style.backgroundColor = "#d35400";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNXV0MDZlNmNibzZncm1scHNweWYxaGF1MmhhY3IxYnN3ejNvMDlvOSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/8UGoOaR1lA1uaAN892/giphy.gif";
+            }
+            config.zoneElement.innerHTML = "";
+        }
+
+        // ==========================================
+        // LAYER 6: QUESTION 4 BRANCH (PAIN LOGIC)
+        // ==========================================
+        function routeQ4() {
+            config.textElement.innerText = "Did you have any pain or something?";
+            config.zoneElement.innerHTML = `
+                <div class="btn-container">
+                    <button class="choice-btn" onclick="q4Result(true)">Yes</button>
+                    <button class="choice-btn" onclick="q4Result(false)">No</button>
+                </div>
+            `;
+        }
+        function q4Result(isYes) {
+            completionRegistry.q4 = true;
+            config.returnBtn.classList.add('hidden');
+            
+            if(isYes) {
+                config.textElement.innerText = "What symptoms are you experiencing?";
+                document.body.style.backgroundColor = "#2c3e50";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExbW9ndWR0aTdpZjhpdWtrYmtzMGQxYzg2bHdqdWJ1ZGJjMTYyc3BpMSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/YS8c0Z7in21AM4A2AR/giphy.gif";
+                
+                config.zoneElement.innerHTML = `
+                    <form id="secure-pain-form">
+                        <div class="checkbox-grid">
+                            <label><input type="checkbox" name="Symptom" value="Headache"> Headache</label>
+                            <label><input type="checkbox" name="Symptom" value="Back Pain"> Back Pain</label>
+                            <label><input type="checkbox" name="Symptom" value="Neck Strain"> Neck Strain</label>
+                            <label><input type="checkbox" name="Symptom" value="Eye Fatigue"> Eye Fatigue</label>
+                            <label><input type="checkbox" name="Symptom" value="Wrist Pain"> Wrist Pain</label>
+                            <label><input type="checkbox" name="Symptom" value="General Fatigue"> Fatigue</label>
+                        </div>
+                        <textarea name="User-Notes" placeholder="Write logs... Sent securely to dashboard vaults directly."></textarea>
+                        <div class="btn-container">
+                            <button type="button" class="choice-btn" onclick="submitSecureData()">Submit Securely</button>
+                        </div>
+                    </form>
+                `;
+            } else {
+                handlePainTransitionLayer();
+            }
+        }
+        
+        function submitSecureData() {
+            const form = document.getElementById('secure-pain-form');
+            
+            if (SECURE_FORM_ENDPOINT.includes("YOUR_FORM_ID_HERE")) {
+                alert("Form simulation sandbox active.");
+                handlePainTransitionLayer();
+                return;
+            }
+            const formData = new FormData(form);
+            fetch(SECURE_FORM_ENDPOINT, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(response => {
+                if (response.ok) {
+                    handlePainTransitionLayer();
+                } else {
+                    alert("Network error processing data.");
+                }
+            })
+            .catch(error => alert("Submission dropped."));
+        }
+
+        function handlePainTransitionLayer() {
+            if (userIsInOffice) {
+                config.textElement.innerText = "How...";
+                document.body.style.backgroundColor = "#27ae60";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExd2hjMTZrc3ZxbWJvYXFsZzF2Y3FlZ21scjgya3BmNnhxaW5ndG04MyZlcD12MV9naWZzX3NlYXJjaCZjdD1n/lxxOGaDRk4f7R5TkBd/giphy.gif";
+                config.zoneElement.innerHTML = `
+                    <div class="btn-container">
+                        <button class="choice-btn" onclick="routeMeditation()">Continue to Meditation</button>
+                    </div>
+                `;
+            } else {
+                config.textElement.innerText = "Just Final Question...";
+                document.body.style.backgroundColor = "#2980b9";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3dXAxOHd2YTUxc2hzNjh1M3g5MGFnNm92dXF3bXN4anRibjAwdXViZiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/CNtc3K5yNmyrIWW0F4/giphy.gif";
+                config.zoneElement.innerHTML = `
+                    <div class="btn-container">
+                        <button class="choice-btn" onclick="routeLectures()">Continue to Lectures</button>
+                    </div>
+                `;
+            }
+        }
+
+        // ==========================================
+        // LAYER 7: UNIVERSAL QUESTIONS (MEDITATION)
+        // ==========================================
+        function routeMeditation() {
+            config.textElement.innerText = "Did you do your meditation?";
+            config.zoneElement.innerHTML = `
+                <div class="btn-container">
+                    <button class="choice-btn" onclick="meditationResult(true)">Yes</button>
+                    <button class="choice-btn" onclick="meditationResult(false)">No</button>
+                </div>
+            `;
+        }
+        function meditationResult(isYes) {
+            completionRegistry.q5 = true;
+            config.returnBtn.classList.remove('hidden');
+            if(isYes) {
+                config.textElement.innerText = "Peaceful Mind!";
+                document.body.style.backgroundColor = "#9b59b6";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMnpsdnMxYXNwYWU5ZjJxMGE4ZmJtd3l4dTB6Y3lsbW1kMGZkN2F2aiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/WiVvi66FqT2bpym6R8/giphy.gif";
+            } else {
+                config.textElement.innerText = "Take 5 minutes to breathe!";
+                document.body.style.backgroundColor = "#34495e";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExampsYjRkNGR6eHBseXN0NmdndGJrd3h6c3I1NGp1MXdqdWkwbG1lbSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/pPhyAv5t9V8djyRFJH/giphy.gif";
+            }
+            config.zoneElement.innerHTML = "";
+        }
+
+        // ==========================================
+        // LAYER 8: REMOTE COMPLIANCE QUESTIONS (REST)
+        // ==========================================
+        function routeRest() {
+            config.textElement.innerText = "Are you taking rest?";
+            config.zoneElement.innerHTML = `
+                <div class="btn-container">
+                    <button class="choice-btn" onclick="restResult(true)">Yes</button>
+                    <button class="choice-btn" onclick="restResult(false)">No</button>
+                </div>
+            `;
+        }
+        function restResult(isYes) {
+            completionRegistry.q6 = true;
+            config.returnBtn.classList.remove('hidden');
+            if(isYes) {
+                config.textElement.innerText = "Great!";
+                document.body.style.backgroundColor = "#1abc9c";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3eTNyMHI1NHBscHd1N21rNzRtdGVyZGxzcnF0MXk1Zjg5ZzN0dHo3ZCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/SShJcu4ySty1G6MX9A/giphy.gif";
+            } else {
+                config.textElement.innerText = "Take some rest!";
+                document.body.style.backgroundColor = "#d35400";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExampsYjRkNGR6eHBseXN0NmdndGJrd3h6c3I1NGp1MXdqdWkwbG1lbSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/DvyLQztQwmyAM/giphy.gif";
+            }
+            config.zoneElement.innerHTML = "";
+        }
+
+        // ==========================================
+        // LAYER 9: REMOTE COMPLIANCE QUESTIONS (LECTURES)
+        // ==========================================
+        function routeLectures() {
+            config.textElement.innerText = "Are you doing lectures?";
+            config.zoneElement.innerHTML = `
+                <div class="btn-container">
+                    <button class="choice-btn" onclick="lecturesResult(true)">Yes</button>
+                    <button class="choice-btn" onclick="lecturesResult(false)">No</button>
+                </div>
+            `;
+        }
+        function lecturesResult(isYes) {
+            completionRegistry.q7 = true;
+            config.returnBtn.classList.remove('hidden');
+            if(isYes) {
+                config.textElement.innerText = "Keep learning!";
+                document.body.style.backgroundColor = "#4a90e2";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExcHZ6MmFrcXR6ODJ6b2dzNm94d3Z4ZXJlbmxsMjg2enI5dG0wZzNpcCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/G9wixRsmtsXfO6CHih/giphy.gif";
+            } else {
+                config.textElement.innerText = "Time to study!";
+                document.body.style.backgroundColor = "#e67e22";
+                config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExanhxZDJtdmpsdzNicHBzNjI3eWpwZ25yYmhmNWkwNTRtd2NzeWYyaCZlcD12MV9naWZzX3NlYXJjaCZjdD1n/iHe7mA9M9SsyQ/giphy.gif";
+            }
+            config.zoneElement.innerHTML = "";
+        }
+
+        // ==========================================
+        // LAYER 10: UNLOCKED FINAL LEVEL DESTINATION
+        // ==========================================
+        function goToFinalSummaryLayer() {
+            config.returnBtn.classList.add('hidden');
+            document.body.style.backgroundColor = "#2c3e50";
+            config.gifElement.src = "https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3bjAxMHViNWZlbzduMmtpbHNyOTU0ajgyYmg4bG1sd2JsNDhneDg1OSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/M8o1MOwcwsWOmueqN4/giphy.gif";
+            
+            config.textElement.innerText = "All I want to say is I Miss you and I love you ";
+            
+            config.zoneElement.innerHTML = `
+                <div style="font-size:1.1rem; line-height:1.6; margin-bottom:20px;">
+                    Really really I miss you.
+                </div>
+                <div class="btn-container">
+                    <button class="choice-btn" style="background-color:var(--danger-color); color:#fff;" onclick="init()">Reset Full Engine Loop</button>
+                </div>
+            `;
+        }
+
+        init();
+    </script>
+</body>
+</html>
